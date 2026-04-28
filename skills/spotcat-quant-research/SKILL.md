@@ -1,4 +1,7 @@
 ---
+name: spotcat-quant-research
+description: "Quant research loop. Automates: hypothesis -> explore -> prototype -> backtest -> evaluate -> report. For exploratory strategy research and validation."
+user-invocable: false
 type: agent-skill
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 metadata:

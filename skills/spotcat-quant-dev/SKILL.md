@@ -1,4 +1,7 @@
 ---
+name: spotcat-quant-dev
+description: "Quant-adapted SDD with 3-layer test gates. Same state machine as sprint-dev, with quant-specific scoring, unit tests + backtest + data validation. For quantitative trading feature development."
+user-invocable: false
 type: agent-skill
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 metadata:
