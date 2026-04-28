@@ -1,0 +1,10 @@
+{
+  "name": "spotcat-skills",
+  "version": "0.1.0",
+  "description": "SpotCat development workflow skills for OpenClaw agents",
+  "skills": [
+    "skills/spotcat-sprint-dev",
+    "skills/spotcat-quant-dev",
+    "skills/spotcat-quant-research"
+  ]
+}
