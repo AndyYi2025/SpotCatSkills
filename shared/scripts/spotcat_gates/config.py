@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import jsonschema
@@ -14,6 +15,21 @@ class ConfigError(Exception):
     pass
 
 
+def _looks_absolute(path_str: str) -> bool:
+    r"""Check if a path looks absolute without depending on host OS.
+
+    Returns True if the path:
+    - Starts with / or \ (POSIX style or Windows root path)
+    - Matches Windows drive letter pattern like C:/ or D:\
+    """
+    if path_str.startswith("/") or path_str.startswith("\\"):
+        return True
+    # Windows drive letter pattern: C:/, C:\, D:/, etc.
+    if re.match(r"^[A-Za-z]:[/\\]", path_str):
+        return True
+    return False
+
+
 def load_config(path: str | Path) -> dict:
     p = Path(path)
     if not p.is_file():
@@ -23,6 +39,8 @@ def load_config(path: str | Path) -> dict:
         raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     except yaml.YAMLError as e:
         raise ConfigError(f"config is not valid YAML: {e}") from e
+    except (OSError, PermissionError) as e:
+        raise ConfigError(f"config file is not readable: {p}") from e
 
     if not isinstance(raw, dict):
         raise ConfigError("config root must be a mapping")
@@ -41,9 +59,8 @@ def load_config(path: str | Path) -> dict:
 
     # Resolve relative data_root against the project root (2 levels up from config file)
     data_root = raw["paths"]["data_root"]
-    data_root_path = Path(data_root)
 
-    if not data_root_path.is_absolute():
+    if not _looks_absolute(data_root):
         # Config file is at <project_root>/.spotcat/config.yml
         # So project_root is 2 levels up from the config file
         project_root = p.resolve().parent.parent
@@ -51,6 +68,8 @@ def load_config(path: str | Path) -> dict:
         raw["paths"]["data_root"] = str(resolved_path)
     else:
         # Already absolute, but normalize it (handle .. and . segments)
-        raw["paths"]["data_root"] = str(data_root_path.resolve())
+        # Use Path to handle both POSIX and Windows style paths
+        resolved_path = Path(data_root).resolve()
+        raw["paths"]["data_root"] = str(resolved_path)
 
     return raw
