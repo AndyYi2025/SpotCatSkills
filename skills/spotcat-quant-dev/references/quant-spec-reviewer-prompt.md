@@ -18,7 +18,7 @@
    - 策略逻辑是否正确实现？
    - 数据真实性（非合成）：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
    - 仓位限制强制执行：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
-   - 默认 paper 模式：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
+   - 策略是否默认 paper 模式？
 4. 检查量化特有的问题：
    - 前瞻偏差：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
    - 应该放在 config 的参数是否硬编码了

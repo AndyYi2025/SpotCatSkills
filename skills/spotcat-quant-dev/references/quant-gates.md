@@ -20,8 +20,8 @@ python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本�
 - `lookahead-replay`：前瞻偏差位移重放测试
 
 `gate-output.json` 里任一 gate 的 `status` 为 `FAIL` 或 `ERROR` = 本轮不得进入 done，退回 implementing 或
-root-cause（`ERROR` 通常意味着脚本本身跑不起来或配置没接好，不是"数字不达标"，处理方式不同——见
-root-cause-analysis 里新增的第 8 类根因）。
+root-cause（`ERROR` 通常意味着脚本本身跑不起来或配置没接好，不是"数字不达标"，应单独记录根因，不要和"数值不
+达标"混为一谈）。
 
 ## Layer 1: Unit Tests
 
