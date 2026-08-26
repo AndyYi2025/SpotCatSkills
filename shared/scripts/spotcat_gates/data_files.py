@@ -5,14 +5,26 @@ import re
 from datetime import date, timedelta
 from pathlib import Path
 
+
+class DataFilesError(Exception):
+    """Raised when configuration errors prevent data file resolution."""
+    pass
+
+
 _DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
 def _parse_range(config: dict) -> tuple[date, date]:
     rng = config["paths"]["expected_date_range"]
-    start = date.fromisoformat(rng["start"])
+    try:
+        start = date.fromisoformat(rng["start"])
+    except ValueError as e:
+        raise DataFilesError(f"invalid date in expected_date_range: {e}") from e
     end_raw = rng["end"]
-    end = date.today() if end_raw == "auto" else date.fromisoformat(end_raw)
+    try:
+        end = date.today() if end_raw == "auto" else date.fromisoformat(end_raw)
+    except ValueError as e:
+        raise DataFilesError(f"invalid date in expected_date_range: {e}") from e
     return start, end
 
 

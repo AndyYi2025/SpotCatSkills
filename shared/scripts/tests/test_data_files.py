@@ -1,7 +1,9 @@
 import hashlib
 from pathlib import Path
 
-from spotcat_gates.data_files import hash_data_files, missing_dates, resolve_data_files
+import pytest
+
+from spotcat_gates.data_files import DataFilesError, hash_data_files, missing_dates, resolve_data_files
 
 
 def _config(data_root, start, end):
@@ -106,3 +108,19 @@ def test_resolve_data_files_with_end_date_auto(tmp_path):
     # Should include yesterday and today, but not tomorrow
     names = sorted(f.name for f in files)
     assert names == [f"{yesterday.isoformat()}.csv", f"{today.isoformat()}.csv"]
+
+
+def test_resolve_data_files_invalid_start_date_raises_error(tmp_path):
+    """Invalid date string in expected_date_range.start should raise DataFilesError."""
+    (tmp_path / "2024-01-01.csv").write_text("a")
+    cfg = _config(tmp_path, "not-a-date", "2024-01-02")
+    with pytest.raises(DataFilesError):
+        resolve_data_files(cfg)
+
+
+def test_resolve_data_files_invalid_end_date_raises_error(tmp_path):
+    """Invalid date string in expected_date_range.end should raise DataFilesError."""
+    (tmp_path / "2024-01-01.csv").write_text("a")
+    cfg = _config(tmp_path, "2024-01-01", "2024-13-01")
+    with pytest.raises(DataFilesError):
+        resolve_data_files(cfg)
