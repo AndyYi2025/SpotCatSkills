@@ -28,7 +28,11 @@ def resolve_data_files(config: dict) -> list[Path]:
         m = _DATE_RE.search(f.name)
         if not m:
             continue
-        d = date.fromisoformat(m.group(1))
+        try:
+            d = date.fromisoformat(m.group(1))
+        except ValueError:
+            # Skip files with syntactically valid but invalid dates (e.g., 2024-13-40)
+            continue
         if start <= d <= end:
             out.append(f)
     return sorted(out)
@@ -40,7 +44,12 @@ def missing_dates(config: dict, files: list[Path]) -> list[str]:
     for f in files:
         m = _DATE_RE.search(f.name)
         if m:
-            present.add(m.group(1))
+            try:
+                date.fromisoformat(m.group(1))
+                present.add(m.group(1))
+            except ValueError:
+                # Skip files with syntactically valid but invalid dates
+                pass
 
     missing = []
     d = start
@@ -52,10 +61,12 @@ def missing_dates(config: dict, files: list[Path]) -> list[str]:
     return missing
 
 
-def hash_data_files(files: list[Path]) -> str:
+def hash_data_files(files: list[Path], root: Path) -> str:
     lines = []
+    root_resolved = Path(root).resolve()
     for f in sorted(files, key=lambda p: p.name):
         content_hash = hashlib.sha256(Path(f).read_bytes()).hexdigest()
-        lines.append(f"{Path(f).name}:{content_hash}")
+        relpath = Path(f).resolve().relative_to(root_resolved)
+        lines.append(f"{relpath}:{content_hash}")
     combined = "\n".join(sorted(lines))
     return hashlib.sha256(combined.encode("utf-8")).hexdigest()
