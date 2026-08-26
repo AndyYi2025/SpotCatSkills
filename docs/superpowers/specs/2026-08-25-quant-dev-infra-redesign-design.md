@@ -1,8 +1,9 @@
-# SpotCatSkills 量化开发基础设施重新设计（合并终版）
+# SpotCatSkills 量化开发基础设施重新设计（合并终版 · 二次复核后修订）
 
-- 状态：已收敛——合并 botapp-c0 初稿 + spotcat-e4 独立方案，标注分歧裁决
+- 状态：已收敛并完成二次复核——合并 botapp-c0 初稿 + spotcat-e4 独立方案，spotcat-e4 复核合并稿后指出 1 处
+  硬伤（§11 输出捕获缓解措施与全文原则矛盾）+ 2 处需澄清（§6.1 LOC 阈值歧义、P1/P2 日期缺口归属），已修订
 - 输入：本文档前身草稿（同目录）+ `2026-08-25-quant-dev-infra-redesign-design-codex.md`（spotcat-e4 独立产出）
-- 日期：2026-08-25
+- 日期：2026-08-25（初稿）/ 2026-08-26（复核修订）
 - 参考：D:\codebase\megaview\Botapp（omnimay）的治理机制
 
 ## 0. 出发点
@@ -21,13 +22,18 @@
 | 层级 | 内容 | 出错代价 |
 |---|---|---|
 | P0 | 资金安全硬门（kill switch、仓位限制、凭证、防重复下单） | 真实亏钱/失控交易 |
-| P1 | 回测证据完整性（脚本解析真实数字，而非 agent 自述） | 全部下游判断建立在假数据上 |
-| P2 | 可复现性/数据完整性（data hash、前瞻偏差重放测试） | P1 的数字会漂移或被静默污染 |
+| P1 | 回测证据完整性（脚本解析真实数字，而非 agent 自述；**含日期缺口/schema 前置校验**，见 §3） | 全部下游判断建立在假数据上 |
+| P2 | 长期防漂移/审计（data hash、前瞻偏差重放测试——不影响"这次数字对不对"，只影响"未来能否复现"） | 数字会随时间漂移或被静默污染 |
 | P3 | 多项目分发与配置层 | 效率/维护成本，不影响正确性 |
 | P4 | 代码/流程卫生（LOC 预算、PARTIAL 记录、prompt 顺序） | 返工成本，不影响正确性或安全 |
 
+> **排序轴的澄清**（spotcat-e4 复核指出的分歧）：P0-P4 是"出错代价"排序，不是严格的"先跑完这层才跑下一
+> 层"执行顺序。日期缺口校验按代价属于"数据完整性"问题，但按**执行依赖**必须先于 P1 的指标解析（数据有缺口
+> 时算出来的 Sharpe 从一开始就是错的），因此它是 P1 gate-runner 流程里的前置步骤，不是 P2 阶段做完 P1 才
+> 补的动作。P2 剩下的两条（data_hash、位移重放测试）跟 P1 之间才是真正的独立关系，不互相依赖执行顺序。
+
 ```
-P0 → P1 → P2（先在一个试点项目里跑通全部三层，完成至少一次真实 sprint 的 canary 验证）
+P0 → P1（含日期缺口前置校验）→ P2（先在一个试点项目里跑通全部，完成至少一次真实 sprint 的 canary 验证）
   → P3（多项目分发；CHANGELOG 纪律从这里正式启动——P0-P2 阶段不背这个负担，因为还没有第二个消费者）
   → P4（可与 P3 并行，互不阻塞）
 ```
@@ -98,7 +104,22 @@ N 个项目做统一版本管理"没有意义——会把假绿 machinery 版本
 和"指标真实低于阈值"必须是两种不同的退出码/状态**，不能把 parse error 归并成"gate FAIL"，那样等于把工具
 bug 伪装成了业务失败，反而更难发现。
 
-## 4. P2：可复现性与数据完整性
+**输出必须由 Cron harness 独立捕获，不经过 agent 转述。**（spotcat-e4 复核发现的漏洞，纠正 §11 原稿）
+`gate-runner.py` 的 stdout/stderr 必须由触发它的 Cron harness 进程直接落盘存档（子进程输出重定向到
+`.spotcat/runs/<run_id>/gate-output.json`），而不是"要求 agent 在 review 里贴出来"。理由：一旦信任链条里
+有"agent 愿不愿意贴真实输出"这一环，就退回了自述模型，和 P0/P1 全篇"agent 无法覆盖脚本判定"的原则矛盾；
+而且实际运行是无人值守 7×24 Cron，压根没有人在场做"人工抽查"这个动作，指望人工核实在这个场景下等于没有
+缓解。`quality-reviewer-prompt.md` 读的是 harness 落盘的这份文件，不是 agent 自己转述的内容。
+
+**日期缺口/schema 校验是 P1 的前置步骤，不是独立阶段。**（spotcat-e4 复核发现：按"出错代价"分级和按"执行
+依赖顺序"排列是两条不同的轴，这一项如果按代价分进 P2，会漏掉它是 P1 输入前提这个事实）数据本身有日期缺口
+时，P1 脚本算出来的 Sharpe/回撤数字从一开始就是错的——不能先跑完 P1 的指标解析，再靠"后面 P2 阶段"才发现
+数据不完整。因此该校验是 `gate-runner.py` 在 P1 流程里的**前置校验**：跑在 backtest-metrics 解析之前，校
+验不过直接短路退出，不进入指标解析。§9 验收标准与流程图据此调整（见下）。
+
+## 4. P2：可复现性/长期防漂移（不是执行阶段，是审计性质，跟 P1 并列而非顺序依赖）
+
+P2 只保留两条真正独立于"这一次数字对不对"、只影响"未来能不能复现/会不会被污染"的检查：
 
 **前瞻偏差：位移重放测试。** 信号函数分别喂 `data[:T]` 和 `data[:T+k]`，断言 T 处输出逐位相同，抓住"代码
 里直接用了未来数据"的大多数真实 bug。抓不住"数据在 T 时刻是否真的已披露"这类时点可得性问题（重放测试本
@@ -108,10 +129,6 @@ bug 伪装成了业务失败，反而更难发现。
 **历史数据不可变性：`data_hash`。** schema 里带 `data_hash` 字段，脚本对本次用到的数据文件区间算 hash 写
 进结果——不是为了当次门控用，是为了未来审计：某天回测结果对不上，第一件要排除的事是"数据源是不是被静默
 改过"（数据商重新调整了某天价格、修 bug、静默补缺失数据），没有 hash 记录这个问题永远无法确认。
-
-**日期缺口/schema 校验。** 脚本读 `data_root`，实际列出文件覆盖的日期区间跟声明区间做差集，无缺口才 PASS。
-纯文件系统操作，没有语义判断空间，但因为是其它判断的输入前提（数据不完整会导致 Sharpe 算出来就是错的），
-仍要及早跑。
 
 ## 5. P3：多项目分发与配置层
 
@@ -191,11 +208,18 @@ undefined"这种漂移。
 
 `skills/spotcat-sprint-dev/references/quality-reviewer-prompt.md` 已有一条**软性**"文件 < 800 行"检查项
 （"代码质量"维度的扣分项，非硬否决），`scoring.md` 的"可维护性"维度又有一次模糊提到"单体文件过长"。若新
-LOC 棘轮直接塞进 `quant-gates.md`，会出现三套并存标准。**方案**：新建 `shared/code-budget.md`，两个 SDD
-skill 都引用它，统一一个数字（用户拍板：维持接近 800 还是收紧到 megaview 当前脚本值 800/文档值 500，不产
-生第三个数字），删掉旧软性检查项，改成引用新文件的脚本硬否决——移植 megaview `check-code-budget.sh` 算法
-（baseline 棘轮只减不增、`.codebudgetignore` 三条防滥用规则、fail-closed）。**只卡 SDD 的 quality-review
-阶段，不卡 quant-research 的 prototyping/backtesting 阶段**——研究原型允许先写乱，进 sprint 才收紧。
+LOC 棘轮直接塞进 `quant-gates.md`，会出现三套并存标准。
+
+**已核实（2026-08-26）：megaview 自己这个数字就存在真实的文档/代码不同步**——`scripts/_check-code-budget.mjs`
+里 `LINES_HARD = 800`，这是 CI 和本地 pre-push **实际强制生效**的值；但 `docs/code-budget.md` 和 ADR
+`governance-095` 都写"单文件上限 500 行"，是 DX-002 的目标值，**并未真正落地到脚本里**。也就是说 megaview
+自己的文档正是"advisory 会漂移、脚本才是事实"这条道理的反例——不能引用它的文档数字当作"megaview 用的是
+500"，实际在跑的是 800。**方案**：新建 `shared/code-budget.md`，两个 SDD skill 都引用它，统一一个数字
+（用户拍板：维持接近现有 sprint-dev 的 800，还是收紧到 500——不要凭空产生第三个数字，也不要照搬 megaview
+文档里没有真正生效的 500），删掉旧软性检查项，改成引用新文件的脚本硬否决——移植 megaview
+`check-code-budget.sh` 算法（baseline 棘轮只减不增、`.codebudgetignore` 三条防滥用规则、fail-closed）。
+**只卡 SDD 的 quality-review 阶段，不卡 quant-research 的 prototyping/backtesting 阶段**——研究原型允许
+先写乱，进 sprint 才收紧。
 
 ### 6.2 安全检查顺序前移
 
@@ -235,10 +259,11 @@ skill 都引用它，统一一个数字（用户拍板：维持接近 800 还是
 ## 9. 验收标准
 
 - [ ] P0：仓位限制/kill switch(双层)/幂等下单/凭证扫描全部为脚本硬否决，无 advisory 残留；配置缺失 fail-closed
-- [ ] P1：`gate-runner.py` 单次运行输出全部 gate 的统一 JSON；`backtest-result.schema.json` 定稿，至少一个
-      真实项目写出 adapter 并跑通；解析失败与阈值未达标为两种不同状态
-- [ ] P2：位移重放测试 + `data_hash` + 日期缺口校验落地
-- [ ] 以上三层在同一试点项目完整跑通至少一次真实 sprint 的 canary 验证
+- [ ] P1：`gate-runner.py` 单次运行输出全部 gate 的统一 JSON，且 JSON 由 Cron harness 独立落盘捕获（不经
+      agent 转述）；`backtest-result.schema.json` 定稿，至少一个真实项目写出 adapter 并跑通；解析失败与阈值
+      未达标为两种不同状态；**日期缺口/schema 前置校验跑在指标解析之前，不过即短路**
+- [ ] P2：位移重放测试 + `data_hash` 落地（审计/长期防漂移，跟 P1 并行验证，不是 P1 做完才开始）
+- [ ] 以上两层在同一试点项目完整跑通至少一次真实 sprint 的 canary 验证
 - [ ] P3：`.spotcat-version` + `spotcat sync` 脚本可用；config schema 版本化校验生效；CHANGELOG 从此刻启用
 - [ ] P4：LOC 阈值统一为一个数字；`quant-quality-reviewer-prompt.md` 安全检查顺序前移；sprint plan 模板
       PARTIAL/NOT_DONE 字段生效
@@ -254,7 +279,7 @@ skill 都引用它，统一一个数字（用户拍板：维持接近 800 还是
 
 | 风险 | 缓解 |
 |---|---|
-| 脚本层引入后 agent 绕过脚本、自己编结果 | prompt 明确要求"必须贴 gate-runner 原始输出"，quality-review 阶段人工抽查真实性 |
+| 脚本层引入后 agent 绕过脚本、自己编结果 | **不依赖 agent 转述**：Cron harness 独立捕获 `gate-runner.py` 的 stdout/stderr 落盘存档（§3），quality-reviewer 读盘上文件，不读 agent 转述的内容——"要求 agent 贴出来+人工抽查"在无人值守场景等于没有缓解，已废弃这个写法（spotcat-e4 2026-08-26 复核指出） |
 | 跨框架 adapter 一次性成本被低估 | 先在一个真实项目验证 adapter 稳定后再推广，不是全部项目并行起步 |
 | gate 脚本自身有隐藏 bug，比 agent 自述更隐蔽 | 脚本必须有单元测试（合成/历史真实输出）；解析失败与业务 FAIL 分离成不同状态 |
 | vendor 同步的 `.spotcat/vendor/` 与项目其余代码混淆 | `.gitattributes` 标记为 generated；`.spotcat-version` 文件明确来源版本 |
