@@ -29,3 +29,27 @@ def test_credentials_error_on_unreadable_file(tmp_path):
     missing = tmp_path / "does-not-exist.py"
     r = check_credentials([missing])
     assert r.status == "ERROR"
+
+
+def test_credentials_fail_on_django_secret_key(tmp_path):
+    f = tmp_path / "settings.py"
+    f.write_text('SECRET_KEY = "supersecretdjangokey1234567890"\n')
+    r = check_credentials([f])
+    assert r.status == "FAIL"
+    assert r.details["findings"][0]["pattern"] == "generic-assigned-secret"
+
+
+def test_credentials_fail_on_aws_secret_access_key(tmp_path):
+    f = tmp_path / "config.py"
+    f.write_text('AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLE"\n')
+    r = check_credentials([f])
+    assert r.status == "FAIL"
+    assert r.details["findings"][0]["pattern"] == "generic-assigned-secret"
+
+
+def test_credentials_fail_on_dict_style_password(tmp_path):
+    f = tmp_path / "config.py"
+    f.write_text('config = {"password": "abcdefgh12345678901234"}\n')
+    r = check_credentials([f])
+    assert r.status == "FAIL"
+    assert r.details["findings"][0]["pattern"] == "generic-assigned-secret"

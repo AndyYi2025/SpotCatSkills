@@ -11,7 +11,7 @@ _PATTERNS = [
     ("stripe-like-secret", re.compile(r"sk_live_[A-Za-z0-9]{20,}")),
     ("aws-access-key-id", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("generic-assigned-secret", re.compile(
-        r"(?i)(api_key|secret|password|token)\s*=\s*[\"'][A-Za-z0-9/+_\-]{16,}[\"']"
+        r"(?i)\w*(api_key|secret|password|token)\w*[\"']?\s*[:=]\s*[\"']([A-Za-z0-9/+_\-]{16,})[\"']"
     )),
 ]
 
