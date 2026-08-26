@@ -29,7 +29,32 @@ def run_test_command(
 
 
 def check_named_test(report: dict, test_name_suffix: str) -> tuple[bool, bool]:
+    """Check for tests matching the given suffix by anchoring to the last nodeid segment.
+
+    Args:
+        report: pytest-json-report dict with "tests" list
+        test_name_suffix: test name to match (compared to last segment of nodeid after ::)
+
+    Returns:
+        (found, passed) where:
+        - found: True if at least one test matches
+        - passed: True only if ALL matching tests have outcome == "passed"
+    """
+    matching_tests = []
     for t in report.get("tests", []):
-        if t.get("nodeid", "").endswith(test_name_suffix):
-            return True, t.get("outcome") == "passed"
-    return False, False
+        nodeid = t.get("nodeid", "")
+        # Split by :: and check if the last segment exactly matches
+        if "::" in nodeid:
+            last_segment = nodeid.split("::")[-1]
+        else:
+            last_segment = nodeid
+
+        if last_segment == test_name_suffix:
+            matching_tests.append(t)
+
+    if not matching_tests:
+        return False, False
+
+    # All matching tests must have outcome == "passed"
+    all_passed = all(t.get("outcome") == "passed" for t in matching_tests)
+    return True, all_passed

@@ -53,3 +53,29 @@ def test_run_test_command_nonzero_exit_still_reads_report(tmp_path):
     config = {"commands": {"test": "python -c \"import sys; sys.exit(1)\""}}
     result = run_test_command(config, tmp_path, report_relpath=".spotcat/last-test-result.json")
     assert result == REPORT
+
+
+def test_check_named_test_no_literal_suffix_false_positive():
+    # Test that a nodeid ending with the suffix string doesn't falsely match
+    # e.g., "test_final_test_position_limit_enforced" should not match "test_position_limit_enforced"
+    report = {
+        "tests": [
+            {"nodeid": "tests/test_x.py::test_final_test_position_limit_enforced", "outcome": "passed"},
+        ]
+    }
+    found, passed = check_named_test(report, "test_position_limit_enforced")
+    assert (found, passed) == (False, False)
+
+
+def test_check_named_test_multiple_same_name_checks_all():
+    # Test that when the same test name appears in multiple files,
+    # we check ALL of them and fail if ANY fails
+    report = {
+        "tests": [
+            {"nodeid": "tests/test_unit.py::test_position_limit_enforced", "outcome": "passed"},
+            {"nodeid": "tests/test_integration.py::test_position_limit_enforced", "outcome": "failed"},
+        ]
+    }
+    found, passed = check_named_test(report, "test_position_limit_enforced")
+    # Should find both, but fail because not ALL are passed
+    assert (found, passed) == (True, False)
