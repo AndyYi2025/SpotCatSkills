@@ -10,6 +10,8 @@ from spotcat_gates.result import GateResult
 def _run_replay(cmd_template: str, cutoff: str, project_root: Path) -> list[dict]:
     cmd = cmd_template.format(cutoff=cutoff)
     proc = subprocess.run(cmd, shell=True, cwd=project_root, capture_output=True, text=True, timeout=600)
+    if proc.returncode != 0:
+        raise RuntimeError(f"replay command exited with code {proc.returncode}: {proc.stderr.strip()}")
     return json.loads(proc.stdout)
 
 
@@ -28,11 +30,18 @@ def check_lookahead_replay(config: dict, project_root: Path) -> GateResult:
             details={"reason": "commands.lookahead_replay not configured — gate not wired up"},
         )
 
-    t, t_plus_k = dates["t"], dates["t_plus_k"]
+    t = dates.get("t")
+    t_plus_k = dates.get("t_plus_k")
+    if not t or not t_plus_k:
+        return GateResult(
+            gate="lookahead-replay", status="ERROR", evidence_tier="B",
+            details={"reason": "paths.replay_check_dates is missing 't' or 't_plus_k'"},
+        )
+
     try:
         run_t = _run_replay(cmd_template, t, project_root)
         run_t_plus_k = _run_replay(cmd_template, t_plus_k, project_root)
-    except (subprocess.SubprocessError, OSError, json.JSONDecodeError) as e:
+    except (subprocess.SubprocessError, OSError, json.JSONDecodeError, RuntimeError) as e:
         return GateResult(
             gate="lookahead-replay", status="ERROR", evidence_tier="B",
             details={"reason": f"replay command failed: {e}"},

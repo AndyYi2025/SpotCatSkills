@@ -57,3 +57,26 @@ def test_error_when_replay_check_dates_missing(tmp_path):
     r = check_lookahead_replay(config, tmp_path)
     assert r.status == "ERROR"
     assert "replay_check_dates" in r.details["reason"]
+
+
+def test_error_when_replay_check_dates_missing_t_plus_k(tmp_path):
+    config = {
+        "paths": {"replay_check_dates": {"t": "2024-06-01"}},  # missing t_plus_k
+        "commands": {"lookahead_replay": f"python {tmp_path / 'replay.py'} --cutoff {{cutoff}}"},
+    }
+    r = check_lookahead_replay(config, tmp_path)
+    assert r.status == "ERROR"
+    assert "t" in r.details["reason"] or "t_plus_k" in r.details["reason"]
+
+
+def test_error_when_replay_command_exits_nonzero(tmp_path):
+    # Create a replay script that exits with error code but still prints JSON
+    script = tmp_path / "replay.py"
+    script.write_text(
+        "import sys, json\n"
+        "print(json.dumps([{'timestamp': '2024-06-01T00:00:00', 'signal': 1}]))\n"
+        "sys.exit(1)\n"
+    )
+    r = check_lookahead_replay(_config(tmp_path), tmp_path)
+    assert r.status == "ERROR"
+    assert "exited" in r.details["reason"] or "failed" in r.details["reason"]
