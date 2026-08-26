@@ -2,6 +2,27 @@
 
 所有 3 层必须通过才能 quality-review PASS。
 
+## 自动化门控（gate-runner）
+
+以下检查已脚本化，不再由 agent 手动判断。quality-review 阶段必须先跑：
+
+```bash
+python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本轮 run_id>
+```
+
+结果写在 `.spotcat/runs/<run_id>/gate-output.json`，agent 读这份文件，不自己复述数字或判断是否达标。
+
+已脚本化（不再需要 agent 手动验证，见文件对应 gate 名）：
+- `credentials`：凭证扫描
+- `position-limit` / `idempotency` / `kill-switch`：P0 行为性测试是否存在且通过
+- `date-gap`：数据日期完整性（P1 前置，失败则 backtest-metrics/lookahead-replay 记为 ERROR 并跳过）
+- `backtest-metrics`：Sharpe/回撤/交易次数/样本内外差距，含 data_hash 校验
+- `lookahead-replay`：前瞻偏差位移重放测试
+
+`gate-output.json` 里任一 gate 的 `status` 为 `FAIL` 或 `ERROR` = 本轮不得进入 done，退回 implementing 或
+root-cause（`ERROR` 通常意味着脚本本身跑不起来或配置没接好，不是"数字不达标"，处理方式不同——见
+root-cause-analysis 里新增的第 8 类根因）。
+
 ## Layer 1: Unit Tests
 
 **目的：** 隔离验证策略逻辑正确性。
@@ -10,9 +31,8 @@
 - 用已知输入/输出测试策略信号生成
 - 测试边缘情况：空数据、单根 bar、极端值
 - 测试错误处理路径（坏数据、缺失字段）
-- 测试仓位限制强制执行逻辑
 
-**门控：** 所有 unit tests 通过（绿色）。
+**门控：** 所有 unit tests 通过（绿色）。`position-limit`/`idempotency`/`kill-switch` 已脚本化，见上方「自动化门控」。
 
 ## Layer 2: Backtest
 
@@ -21,16 +41,8 @@
 **要求：**
 - 使用项目文档化数据路径中的真实市场数据运行
 - 报告：Sharpe 比率、最大回撤、胜率、交易次数
-- 验证无前瞻偏差（每个点的信号只用历史数据）
-- 阈值在 sprint-plan 或项目 CLAUDE.md 中定义：
-  - Sharpe ≥ {min_sharpe}
-  - 最大回撤 ≤ {max_drawdown}
-  - 交易次数 ≥ {min_trades}
 
-**门控：**
-- 回测无错误完成
-- 所有性能阈值满足
-- 未检测到前瞻偏差
+**门控：** 已脚本化，见上方「自动化门控」（gate: `backtest-metrics`）。
 
 ## Layer 3: Data Validation
 
@@ -38,11 +50,6 @@
 
 **要求：**
 - 数据从项目 CLAUDE.md 中文档化的路径加载
-- 日期范围完整（无意外缺口）
-- 未使用任何合成或假数据
 - 数据格式符合预期 schema
 
-**门控：**
-- 所有数据路径解析到真实文件
-- 日期范围匹配预期覆盖
-- 未在任何测试或回测中检测到合成数据
+**门控：** 已脚本化，见上方「自动化门控」（gate: `date-gap`）。

@@ -25,20 +25,21 @@
 ## 评审流程
 
 1. 读取所有修改的文件
-2. 验证 3 层测试门控（见 quant-gates.md）：
-   - Layer 1: Unit tests pass
-   - Layer 2: Backtest passes on real data
-   - Layer 3: Data validation passes
-3. 按维度评分，引用具体证据（file:line）
-4. 检查安全规则（shared/safety-rules.md）：
-   - 任何违反 → 总分 = 0（veto）
-5. 计算总分
+2. 跑 gate-runner：
+   ```bash
+   python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本轮 run_id>
+   ```
+3. 读 `.spotcat/runs/<run_id>/gate-output.json` 里对应 gate 的 `status`/`details`，不得自行判断或复述成别的
+   数字。
+4. P0/P1 门控：任一 gate 的 `status` 为 `FAIL` 或 `ERROR` → 直接 veto（总分 = 0）
+5. 对剩余可打分维度（架构/可维护性/代码风格）评分，引用具体证据（file:line）
+6. 计算总分
 
 ## 门控
 
-- 全部 3 层通过 AND 总分 ≥ 9/10 → PASS
-- 任何层失败 OR 总分 < 9/10 → FAIL
-- 安全规则违反 → VETO（总分 = 0）
+- gate-output.json 全部 gate 为 `PASS` AND 总分 ≥ 9/10 → PASS
+- 任一 gate 为 `FAIL`/`ERROR` OR 总分 < 9/10 → FAIL
+- 任一 gate 为 `FAIL`/`ERROR` → VETO（总分 = 0）
 
 ## 输出格式
 

@@ -48,13 +48,14 @@
 
 ### Layer 2: Backtest
 - 使用项目数据路径中的真实历史数据运行回测
-- 验证：Sharpe 比率、最大回撤、交易次数、无前瞻偏差
 - 使用项目的回测框架
 
 ### Layer 3: Data Validation
-- 验证数据从文档化的正确路径加载
-- 验证日期范围完整（无缺口）
-- 验证未使用任何合成/假数据
+- 数据从文档化的正确路径加载
+
+实现完成后，可自行运行 `python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本轮 run_id>`
+获取早期反馈（Sharpe/回撤/交易次数/前瞻偏差/日期完整性/合成数据等，见 `quant-gates.md`「自动化门控」），但不代表
+正式验证通过——quality-review 阶段会重新读取 `.spotcat/runs/<run_id>/gate-output.json` 做权威判定。
 
 ## 约束
 

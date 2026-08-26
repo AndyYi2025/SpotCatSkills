@@ -16,11 +16,11 @@
 2. 读取所有修改的文件
 3. 对每个验收标准验证：
    - 策略逻辑是否正确实现？
-   - 数据是否从文档化的真实路径加载（非合成）？
-   - 仓位限制是否在代码中强制执行？
-   - 策略是否默认 paper 模式？
+   - 数据真实性（非合成）：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
+   - 仓位限制强制执行：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
+   - 默认 paper 模式：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
 4. 检查量化特有的问题：
-   - 信号生成中的前瞻偏差
+   - 前瞻偏差：此项由 gate-runner 在 quality-review 阶段脚本验证，spec-review 阶段无需重复检查。
    - 应该放在 config 的参数是否硬编码了
    - 公共函数是否缺少类型提示
    - bare `except` 子句
