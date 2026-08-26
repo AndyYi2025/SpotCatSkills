@@ -17,11 +17,16 @@ def check_backtest_metrics(config: dict, project_root: Path) -> GateResult:
     project_root = Path(project_root)
     cmd = config["commands"]["backtest"]
     try:
-        subprocess.run(cmd, shell=True, cwd=project_root, timeout=3600)
+        proc = subprocess.run(cmd, shell=True, cwd=project_root, timeout=3600)
     except (subprocess.SubprocessError, OSError) as e:
         return GateResult(
             gate="backtest-metrics", status="ERROR", evidence_tier="A",
             details={"reason": f"backtest command failed to run: {e}"},
+        )
+    if proc.returncode != 0:
+        return GateResult(
+            gate="backtest-metrics", status="ERROR", evidence_tier="A",
+            details={"reason": f"backtest command exited with code {proc.returncode}"},
         )
 
     out_path = project_root / _OUTPUT_RELPATH
@@ -82,13 +87,17 @@ def check_backtest_metrics(config: dict, project_root: Path) -> GateResult:
         )
 
     is_s, oos_s = result["in_sample_sharpe"], result["out_sample_sharpe"]
-    if is_s != 0:
-        gap_pct = abs(is_s - oos_s) / abs(is_s) * 100
-        if gap_pct > th["max_oos_is_gap_pct"]:
-            return GateResult(
-                gate="backtest-metrics", status="FAIL", evidence_tier="A",
-                details={"reason": f"oos/is gap {gap_pct:.1f}% > threshold {th['max_oos_is_gap_pct']}%"},
-            )
+    if is_s == 0:
+        return GateResult(
+            gate="backtest-metrics", status="FAIL", evidence_tier="A",
+            details={"reason": "in_sample_sharpe is 0, cannot compute oos/is gap ratio — fail-closed rather than silently skip the consistency check"},
+        )
+    gap_pct = abs(is_s - oos_s) / abs(is_s) * 100
+    if gap_pct > th["max_oos_is_gap_pct"]:
+        return GateResult(
+            gate="backtest-metrics", status="FAIL", evidence_tier="A",
+            details={"reason": f"oos/is gap {gap_pct:.1f}% > threshold {th['max_oos_is_gap_pct']}%"},
+        )
 
     return GateResult(
         gate="backtest-metrics", status="PASS", evidence_tier="A",

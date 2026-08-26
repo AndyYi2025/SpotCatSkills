@@ -140,3 +140,41 @@ def test_error_when_expected_date_range_malformed(tmp_path):
     r = check_backtest_metrics(config, project_root)
     assert r.status == "ERROR"
     assert "reason" in r.details
+
+
+def test_fail_when_in_sample_sharpe_is_zero(tmp_path):
+    """in_sample_sharpe == 0 must not silently skip the oos/is gap check (which would
+    let a catastrophic out_sample_sharpe slip through as PASS since out_sample_sharpe
+    is otherwise never checked on its own) -- fail closed instead."""
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "2024-01-01.csv").write_text("x")
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    config = _config(project_root, data_root)
+    real_hash = hash_data_files(resolve_data_files(config), Path(config["paths"]["data_root"]))
+    _write_result(project_root, data_hash=real_hash, in_sample_sharpe=0.0, out_sample_sharpe=-8.0)
+
+    r = check_backtest_metrics(config, project_root)
+    assert r.status == "FAIL"
+    assert "cannot compute" in r.details["reason"].lower()
+
+
+def test_error_when_backtest_command_exits_nonzero(tmp_path):
+    """A nonzero exit code means the backtest run itself failed -- must not fall through
+    to reading a stale result file left over from a previous successful run."""
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "2024-01-01.csv").write_text("x")
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    config = _config(project_root, data_root)
+    config["commands"]["backtest"] = 'python -c "import sys; sys.exit(1)"'
+    real_hash = hash_data_files(resolve_data_files(config), Path(config["paths"]["data_root"]))
+    _write_result(project_root, data_hash=real_hash)  # stale but well-formed and threshold-passing
+
+    r = check_backtest_metrics(config, project_root)
+    assert r.status == "ERROR"
+    assert "exit" in r.details["reason"].lower()
