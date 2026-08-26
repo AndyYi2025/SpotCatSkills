@@ -1,0 +1,22 @@
+version: 1
+spotcat_schema_version: 1
+paths:
+  data_root: /tmp/data
+  data_format: parquet
+  expected_date_range: { start: "2024-01-01", end: "2024-12-31" }
+commands:
+  test: "pytest tests/ -v --json-report --json-report-file=.spotcat/last-test-result.json"
+  backtest: "python -m backtest.run --strategy {strategy}"
+thresholds:
+  min_sharpe: 1.0
+  max_drawdown: 0.15
+  min_trades: 30
+  max_oos_is_gap_pct: 50
+code_budget:
+  max_file_loc: 500
+  ignore_file: .codebudgetignore
+safety:
+  paper_only: true
+  live_enable_flag_path: .spotcat/LIVE_ENABLED
+  global_kill_switch: "~/.spotcat/GLOBAL_LIVE_ENABLE"
+  idempotency_key_format: "{strategy_id}_{signal_timestamp}_{side}"

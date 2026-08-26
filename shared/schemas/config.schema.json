@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SpotCat project config",
+  "type": "object",
+  "required": ["version", "spotcat_schema_version", "paths", "commands", "thresholds", "code_budget", "safety"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "spotcat_schema_version": {"type": "integer"},
+    "paths": {
+      "type": "object",
+      "required": ["data_root", "data_format", "expected_date_range"],
+      "additionalProperties": false,
+      "properties": {
+        "data_root": {"type": "string", "minLength": 1},
+        "data_format": {"type": "string", "minLength": 1},
+        "expected_date_range": {
+          "type": "object",
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {
+            "start": {"type": "string", "format": "date"},
+            "end": {"type": "string"}
+          }
+        },
+        "replay_check_dates": {
+          "type": "object",
+          "required": ["t", "t_plus_k"],
+          "additionalProperties": false,
+          "properties": {
+            "t": {"type": "string", "format": "date"},
+            "t_plus_k": {"type": "string", "format": "date"}
+          }
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "required": ["test", "backtest"],
+      "additionalProperties": false,
+      "properties": {
+        "test": {"type": "string", "minLength": 1},
+        "backtest": {"type": "string", "minLength": 1},
+        "lookahead_replay": {"type": "string", "minLength": 1}
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "required": ["min_sharpe", "max_drawdown", "min_trades", "max_oos_is_gap_pct"],
+      "additionalProperties": false,
+      "properties": {
+        "min_sharpe": {"type": "number"},
+        "max_drawdown": {"type": "number"},
+        "min_trades": {"type": "integer"},
+        "max_oos_is_gap_pct": {"type": "number"},
+        "lookahead_replay_offset_days": {"type": "integer", "default": 5}
+      }
+    },
+    "code_budget": {
+      "type": "object",
+      "required": ["max_file_loc", "ignore_file"],
+      "additionalProperties": false,
+      "properties": {
+        "max_file_loc": {"type": "integer"},
+        "ignore_file": {"type": "string"}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "required": ["paper_only", "live_enable_flag_path", "global_kill_switch", "idempotency_key_format"],
+      "additionalProperties": false,
+      "properties": {
+        "paper_only": {"type": "boolean"},
+        "live_enable_flag_path": {"type": "string", "minLength": 1},
+        "global_kill_switch": {"type": "string", "minLength": 1},
+        "idempotency_key_format": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
