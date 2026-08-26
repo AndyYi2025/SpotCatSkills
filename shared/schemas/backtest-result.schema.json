@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SpotCat regularized backtest result",
+  "type": "object",
+  "required": [
+    "sharpe_ratio", "max_drawdown", "win_rate", "trade_count", "profit_factor",
+    "in_sample_sharpe", "out_sample_sharpe", "lookahead_check", "data_hash", "generated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "sharpe_ratio": {"type": "number"},
+    "max_drawdown": {"type": "number", "minimum": 0},
+    "win_rate": {"type": "number", "minimum": 0, "maximum": 1},
+    "trade_count": {"type": "integer", "minimum": 0},
+    "profit_factor": {"type": "number"},
+    "in_sample_sharpe": {"type": "number"},
+    "out_sample_sharpe": {"type": "number"},
+    "lookahead_check": {"type": "string", "enum": ["not_run", "pass", "fail"]},
+    "data_hash": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "format": "date-time"}
+  }
+}
