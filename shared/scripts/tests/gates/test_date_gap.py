@@ -41,3 +41,12 @@ def test_date_gap_error_on_invalid_end_date(tmp_path):
     r = check_date_gap(_config(tmp_path, "2024-01-01", "2024-13-01"))
     assert r.status == "ERROR"
     assert "reason" in r.details
+
+
+def test_date_gap_error_when_data_root_not_a_directory(tmp_path):
+    """A nonexistent data_root must be ERROR (tool couldn't find the data), not FAIL
+    (which would conflate it with 'data directory exists but has real gaps')."""
+    nonexistent = tmp_path / "does_not_exist"
+    r = check_date_gap(_config(nonexistent, "2024-01-01", "2024-01-02"))
+    assert r.status == "ERROR"
+    assert "reason" in r.details

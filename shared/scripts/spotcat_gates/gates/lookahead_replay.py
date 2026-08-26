@@ -12,7 +12,13 @@ def _run_replay(cmd_template: str, cutoff: str, project_root: Path) -> list[dict
     proc = subprocess.run(cmd, shell=True, cwd=project_root, capture_output=True, text=True, timeout=600)
     if proc.returncode != 0:
         raise RuntimeError(f"replay command exited with code {proc.returncode}: {proc.stderr.strip()}")
-    return json.loads(proc.stdout)
+    result = json.loads(proc.stdout)
+    if not isinstance(result, list) or not all(isinstance(s, dict) and "timestamp" in s for s in result):
+        malformed_summary = repr(result)[:200]
+        raise ValueError(
+            f"replay command output is not a list of {{'timestamp':...}} objects: {malformed_summary}"
+        )
+    return result
 
 
 def check_lookahead_replay(config: dict, project_root: Path) -> GateResult:
@@ -41,7 +47,7 @@ def check_lookahead_replay(config: dict, project_root: Path) -> GateResult:
     try:
         run_t = _run_replay(cmd_template, t, project_root)
         run_t_plus_k = _run_replay(cmd_template, t_plus_k, project_root)
-    except (subprocess.SubprocessError, OSError, json.JSONDecodeError, RuntimeError) as e:
+    except (subprocess.SubprocessError, OSError, json.JSONDecodeError, RuntimeError, ValueError) as e:
         return GateResult(
             gate="lookahead-replay", status="ERROR", evidence_tier="B",
             details={"reason": f"replay command failed: {e}"},

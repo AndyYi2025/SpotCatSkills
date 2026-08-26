@@ -111,6 +111,46 @@ def test_run_all_gates_fail_on_behavioral_test(tmp_path):
     assert position_limit.status == "FAIL"
 
 
+def test_run_all_gates_test_report_error_emits_three_distinctly_named_gates(tmp_path):
+    """A TestReportError from run_test_command (e.g. the test command never writes the
+    pytest-json-report file) must fan out into 3 separately-named gate results
+    (position-limit/idempotency/kill-switch), matching the shape of the normal path — not 3
+    copies of one 'behavioral-tests' GateResult object."""
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    (data_root / "2024-01-01.csv").write_text("x")
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    # A test script that runs successfully but never writes .spotcat/last-test-result.json,
+    # so run_test_command raises TestReportError("report file not found: ...").
+    test_script = project_root / "run_tests.py"
+    test_script.write_text("pass\n")
+    backtest_script = project_root / "run_backtest.py"
+    backtest_script.write_text("pass\n")
+
+    config_yaml = CONFIG_YAML.format(
+        data_root=data_root.as_posix(),
+        test_script=test_script.as_posix(),
+        backtest_script=backtest_script.as_posix(),
+    )
+    config_path = project_root / ".spotcat" / "config.yml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(config_yaml)
+
+    from spotcat_gates.config import load_config
+    config = load_config(config_path)
+
+    results, overall = run_all_gates(config, project_root)
+    named = {r.gate: r for r in results if r.gate in ("position-limit", "idempotency", "kill-switch")}
+    assert set(named) == {"position-limit", "idempotency", "kill-switch"}
+    assert "behavioral-tests" not in {r.gate for r in results}
+    for gate_name, r in named.items():
+        assert r.status == "ERROR"
+        assert "report file not found" in r.details["reason"]
+    assert overall == "ERROR"
+
+
 def test_main_writes_output_and_returns_nonzero_on_fail(tmp_path, monkeypatch, capsys):
     project_root, config_path = _make_pilot_project(tmp_path, all_tests_pass=False)
     from spotcat_gates.gate_runner import main
@@ -123,6 +163,37 @@ def test_main_writes_output_and_returns_nonzero_on_fail(tmp_path, monkeypatch, c
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     assert payload["overall_status"] == "FAIL"
     assert payload["run_id"] == "test-run-1"
+
+
+def test_main_writes_error_output_on_unhandled_exception(tmp_path, monkeypatch, capsys):
+    """Even an unexpected exception mid-run_all_gates must still leave a gate-output.json on
+    disk with overall_status=ERROR — the whole point of this layer is that a result exists on
+    disk independent of whether anything upstream behaved as expected."""
+    project_root, config_path = _make_pilot_project(tmp_path, all_tests_pass=True)
+    import spotcat_gates.gate_runner as gate_runner_module
+    from spotcat_gates.gate_runner import main
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(gate_runner_module, "check_credentials", _boom)
+
+    exit_code = main(["--config", str(config_path), "--run-id", "test-run-crash"])
+    assert exit_code == 1
+
+    out_path = project_root / ".spotcat" / "runs" / "test-run-crash" / "gate-output.json"
+    assert out_path.is_file()
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["overall_status"] == "ERROR"
+    assert payload["run_id"] == "test-run-crash"
+    assert payload["gates"] == [
+        {
+            "gate": "gate-runner",
+            "status": "ERROR",
+            "evidence_tier": "A",
+            "details": {"reason": "unhandled exception during gate execution: boom"},
+        }
+    ]
 
 
 # --- amendment: credentials-gate file listing must exclude common non-source directories ---

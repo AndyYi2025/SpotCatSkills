@@ -80,3 +80,15 @@ def test_error_when_replay_command_exits_nonzero(tmp_path):
     r = check_lookahead_replay(_config(tmp_path), tmp_path)
     assert r.status == "ERROR"
     assert "exited" in r.details["reason"] or "failed" in r.details["reason"]
+
+
+def test_error_when_replay_output_missing_timestamp_key(tmp_path):
+    # Valid JSON, valid list, but elements are missing the required "timestamp" key.
+    script = tmp_path / "replay.py"
+    script.write_text(
+        "import json\n"
+        "print(json.dumps([{'time': '2024-06-01', 'value': 1}]))\n"
+    )
+    r = check_lookahead_replay(_config(tmp_path), tmp_path)
+    assert r.status == "ERROR"
+    assert "timestamp" in r.details["reason"]

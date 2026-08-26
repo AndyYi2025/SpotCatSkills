@@ -25,6 +25,8 @@ def _parse_range(config: dict) -> tuple[date, date]:
         end = date.today() if end_raw == "auto" else date.fromisoformat(end_raw)
     except ValueError as e:
         raise DataFilesError(f"invalid date in expected_date_range: {e}") from e
+    if start > end:
+        raise DataFilesError(f"expected_date_range.start ({start}) is after end ({end})")
     return start, end
 
 

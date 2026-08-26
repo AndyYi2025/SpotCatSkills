@@ -37,8 +37,9 @@ def run_all_gates(config: dict, project_root: Path) -> tuple[list[GateResult], s
     try:
         report = run_test_command(config, project_root)
     except TestReportError as e:
-        err = GateResult(gate="behavioral-tests", status="ERROR", evidence_tier="A", details={"reason": str(e)})
-        results.extend([err, err, err])
+        reason = str(e)
+        for gate_name in ("position-limit", "idempotency", "kill-switch"):
+            results.append(GateResult(gate=gate_name, status="ERROR", evidence_tier="A", details={"reason": reason}))
         report = None
 
     if report is not None:
@@ -82,7 +83,20 @@ def main(argv: list[str] | None = None) -> int:
     project_root = Path(args.config).resolve().parent.parent  # .spotcat/config.yml -> project root
     run_id = args.run_id or new_run_id()
 
-    results, overall = run_all_gates(config, project_root)
+    try:
+        results, overall = run_all_gates(config, project_root)
+    except Exception as e:
+        # 保证「结果文件独立于 agent 是否诚实存在于磁盘」这一核心保证：任何未预期的异常也必须落盘一份
+        # ERROR 结果，而不是让整个 run 不留下任何 gate-output.json。
+        results = [GateResult(
+            gate="gate-runner", status="ERROR", evidence_tier="A",
+            details={"reason": f"unhandled exception during gate execution: {e}"},
+        )]
+        overall = "ERROR"
+        out_path = write_gate_output(project_root, run_id, results, overall)
+        print(f"gate-runner: unhandled exception, overall={overall} output={out_path}", file=sys.stderr)
+        return 1
+
     out_path = write_gate_output(project_root, run_id, results, overall)
     print(f"gate-runner: overall={overall} output={out_path}")
 

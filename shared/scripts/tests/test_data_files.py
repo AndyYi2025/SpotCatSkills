@@ -124,3 +124,11 @@ def test_resolve_data_files_invalid_end_date_raises_error(tmp_path):
     cfg = _config(tmp_path, "2024-01-01", "2024-13-01")
     with pytest.raises(DataFilesError):
         resolve_data_files(cfg)
+
+
+def test_resolve_data_files_start_after_end_raises_error(tmp_path):
+    """start > end is a degenerate range — must raise, not silently produce zero files."""
+    (tmp_path / "2024-01-01.csv").write_text("a")
+    cfg = _config(tmp_path, "2024-01-03", "2024-01-01")
+    with pytest.raises(DataFilesError, match="after end"):
+        resolve_data_files(cfg)

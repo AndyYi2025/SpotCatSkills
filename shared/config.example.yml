@@ -1,17 +1,23 @@
 version: 1
 spotcat_schema_version: 1
 paths:
-  data_root: /tmp/data
+  data_root: D:/quantdata/markets/CNFUT/
   data_format: parquet
   expected_date_range: { start: "2024-01-01", end: "2024-12-31" }
+  replay_check_dates: { t: "2024-06-01", t_plus_k: "2024-06-08" }
 commands:
   test: "pytest tests/ -v --json-report --json-report-file=.spotcat/last-test-result.json"
-  backtest: "python -m backtest.run --strategy {strategy}"
+  # 项目自己的回测脚本负责选择跑哪个策略（内部写死单一入口，或用项目自身的机制切换）——SpotCat 端
+  # 只认 --output 写出的那份符合 backtest-result.schema.json 的 JSON，不做 {strategy} 之类的模板替换。
+  # 唯一会被 .format() 替换占位符的是 lookahead_replay 的 {cutoff}（见 backtest_metrics.py/gate_runner）。
+  backtest: "python -m backtest.run --output .spotcat/last-backtest-result.json"
+  lookahead_replay: "python -m backtest.replay --cutoff {cutoff}"
 thresholds:
   min_sharpe: 1.0
   max_drawdown: 0.15
   min_trades: 30
   max_oos_is_gap_pct: 50
+  lookahead_replay_offset_days: 5
 code_budget:
   max_file_loc: 500
   ignore_file: .codebudgetignore

@@ -14,8 +14,12 @@ python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本�
 
 已脚本化（不再需要 agent 手动验证，见文件对应 gate 名）：
 - `credentials`：凭证扫描
-- `position-limit` / `idempotency` / `kill-switch`：P0 行为性测试是否存在且通过
-- `date-gap`：数据日期完整性（P1 前置，失败则 backtest-metrics/lookahead-replay 记为 ERROR 并跳过）
+- `position-limit` / `idempotency` / `kill-switch`：P0 行为性测试是否存在且通过——**仅检查指定名字的测试存
+  在且通过，不验证该测试是否真的调用了生产策略代码（而非只断言本地字面量）**。测试是否真的构成对真实代码的
+  有效验证，仍是人工/LLM 判断，不是脚本判定的对象。
+- `date-gap`：数据日期完整性（P1 前置，失败则 backtest-metrics/lookahead-replay 记为 ERROR 并跳过）——**仅
+  检查每个日历日期是否存在对应的数据文件，不能、也不会判断文件内容是真实市场数据还是编造/合成数据**。数据
+  真实性（非合成）依然是 LLM/人工判断，不在脚本门控范围内。
 - `backtest-metrics`：Sharpe/回撤/交易次数/样本内外差距，含 data_hash 校验
 - `lookahead-replay`：前瞻偏差位移重放测试
 
@@ -46,10 +50,13 @@ root-cause（`ERROR` 通常意味着脚本本身跑不起来或配置没接好�
 
 ## Layer 3: Data Validation
 
-**目的：** 验证数据完整性和来源。
+**目的：** 验证数据日期完整性（按预期日期范围逐日检查文件是否存在）。**不验证数据来源真实性**——数据是否为
+真实市场数据（而非合成/编造）没有任何脚本能判断，仍需 LLM/人工判读（见
+`quant-quality-reviewer-prompt.md` 的安全规则检查）。
 
 **要求：**
 - 数据从项目 CLAUDE.md 中文档化的路径加载
 - 数据格式符合预期 schema
+- 数据确系真实市场数据，非合成/编造（此项由 LLM/人工判读，非脚本验证）
 
-**门控：** 已脚本化，见上方「自动化门控」（gate: `date-gap`）。
+**门控：** 日期完整性已脚本化，见上方「自动化门控」（gate: `date-gap`）；数据真实性判断不在脚本门控范围内。
