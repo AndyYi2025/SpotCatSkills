@@ -54,8 +54,9 @@
 - 数据从文档化的正确路径加载
 
 实现完成后，可自行运行 `python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本轮 run_id>`
-获取早期反馈（Sharpe/回撤/交易次数/前瞻偏差/日期完整性/合成数据等，见 `quant-gates.md`「自动化门控」），但不代表
-正式验证通过——quality-review 阶段会重新读取 `.spotcat/runs/<run_id>/gate-output.json` 做权威判定。
+获取早期反馈（Sharpe/回撤/交易次数/前瞻偏差/日期完整性等，见 `quant-gates.md`「自动化门控」），但不代表正式验
+证通过——quality-review 阶段会重新读取 `.spotcat/runs/<run_id>/gate-output.json` 做权威判定。数据真实性（
+非合成）不在上述脚本反馈范围内，没有任何 gate 能检测，仍需人工/LLM 判断（见「实现规则」第 1 条）。
 
 ## 约束
 
