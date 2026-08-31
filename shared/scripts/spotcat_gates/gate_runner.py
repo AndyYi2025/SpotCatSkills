@@ -8,6 +8,7 @@ from spotcat_gates.capture import new_run_id, write_gate_output
 from spotcat_gates.config import ConfigError, load_config
 from spotcat_gates.gates.backtest_metrics import check_backtest_metrics
 from spotcat_gates.gates.behavioral import check_idempotency, check_kill_switch, check_position_limit
+from spotcat_gates.gates.code_budget import check_code_budget
 from spotcat_gates.gates.credentials import check_credentials
 from spotcat_gates.gates.date_gap import check_date_gap
 from spotcat_gates.gates.lookahead_replay import check_lookahead_replay
@@ -33,6 +34,7 @@ def run_all_gates(config: dict, project_root: Path) -> tuple[list[GateResult], s
         f for f in project_root.rglob("*.py") if not _is_excluded(f, project_root)
     ]
     results.append(check_credentials(strategy_files))
+    results.append(check_code_budget(config, project_root, strategy_files))
 
     try:
         report = run_test_command(config, project_root)

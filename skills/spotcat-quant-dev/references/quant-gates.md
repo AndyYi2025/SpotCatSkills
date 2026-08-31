@@ -22,6 +22,9 @@ python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本�
   真实性（非合成）依然是 LLM/人工判断，不在脚本门控范围内。
 - `backtest-metrics`：Sharpe/回撤/交易次数/样本内外差距，含 data_hash 校验
 - `lookahead-replay`：前瞻偏差位移重放测试
+- `code-budget`：单文件行数是否超过 `code_budget.max_file_loc`（`code_budget.ignore_file` 里列出的文件/模式
+  除外）。**不属于下面 3 层测试门控**，是独立的代码卫生检查（对应可维护性打分维度），但同样由 gate-runner
+  跑出、同样不允许 agent 自己数行数替代。
 
 `gate-output.json` 里任一 gate 的 `status` 为 `FAIL` 或 `ERROR` = 本轮不得进入 done，退回 implementing 或
 root-cause（`ERROR` 通常意味着脚本本身跑不起来或配置没接好，不是"数字不达标"，应单独记录根因，不要和"数值不
