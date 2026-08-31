@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SpotCat regularized factor evaluation result",
+  "type": "object",
+  "required": [
+    "mean_rank_ic", "icir", "ic_in_sample", "ic_out_sample", "partial_ic_vs_control",
+    "n_dates", "n_obs", "lookahead_check", "data_hash", "generated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "mean_rank_ic": {"type": "number", "minimum": -1, "maximum": 1},
+    "icir": {"type": "number"},
+    "ic_in_sample": {"type": "number", "minimum": -1, "maximum": 1},
+    "ic_out_sample": {"type": "number", "minimum": -1, "maximum": 1},
+    "partial_ic_vs_control": {
+      "type": ["number", "null"],
+      "minimum": -1,
+      "maximum": 1,
+      "description": "对已采纳因子池取正交化后的偏 IC（QBE 所称 'the key factor gate'）。因子池为空（没有可对照的已采纳因子）时为 null，不是 0 —— 0 意味着'算过、正交性为零'，null 意味着'没法算'，两者不能混用。"
+    },
+    "n_dates": {"type": "integer", "minimum": 0},
+    "n_obs": {"type": "integer", "minimum": 0},
+    "lookahead_check": {"type": "string", "enum": ["not_run", "pass", "fail"]},
+    "data_hash": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "format": "date-time"}
+  }
+}
