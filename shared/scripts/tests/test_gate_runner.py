@@ -211,6 +211,24 @@ def test_is_excluded_false_for_normal_source_file():
     assert not _is_excluded(p, project_root)
 
 
+def test_run_all_gates_duplicate_symbols_fail_does_not_flip_overall_status(tmp_path):
+    """duplicate-symbols is advisory (heuristic, real false-positive rate) -- its FAIL must show up
+    in gate-output.json for the reviewer to read, but must NOT by itself turn overall_status FAIL,
+    unlike credentials/date-gap/backtest-metrics which are hard vetoes."""
+    project_root, config_path = _make_pilot_project(tmp_path, all_tests_pass=True)
+    (project_root / "a.py").write_text("def calculate_signal():\n    pass\n")
+    (project_root / "b.py").write_text("def calculate_signal():\n    pass\n")
+    from spotcat_gates.config import load_config
+    config = load_config(config_path)
+
+    results, overall = run_all_gates(config, project_root)
+    dup = next(r for r in results if r.gate == "duplicate-symbols")
+    assert dup.status == "FAIL"
+    # overall is still ERROR here (from lookahead-replay, same as test_run_all_gates_pass) --
+    # the point is it's not FAIL, i.e. duplicate-symbols' FAIL was excluded from the computation.
+    assert overall != "FAIL"
+
+
 def test_run_all_gates_credentials_scan_excludes_venv_and_spotcat_dirs(tmp_path):
     project_root, config_path = _make_pilot_project(tmp_path, all_tests_pass=True)
     from spotcat_gates.config import load_config

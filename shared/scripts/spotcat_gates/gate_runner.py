@@ -11,6 +11,7 @@ from spotcat_gates.gates.behavioral import check_idempotency, check_kill_switch,
 from spotcat_gates.gates.code_budget import check_code_budget
 from spotcat_gates.gates.credentials import check_credentials
 from spotcat_gates.gates.date_gap import check_date_gap
+from spotcat_gates.gates.duplicate_symbols import check_duplicate_symbols
 from spotcat_gates.gates.lookahead_replay import check_lookahead_replay
 from spotcat_gates.result import GateResult
 from spotcat_gates.test_report import TestReportError, run_test_command
@@ -18,6 +19,12 @@ from spotcat_gates.test_report import TestReportError, run_test_command
 # 常见非源码目录：第三方/虚拟环境依赖、VCS 内部数据、本工具自身运行时产物。
 # 凭据扫描不应遍历这些目录 —— 既慢，又容易在项目作者未编写的代码上产生误报。
 _EXCLUDED_DIR_NAMES = {".venv", "venv", "__pycache__", ".git", "node_modules", ".spotcat"}
+
+# 这些 gate 的 FAIL/ERROR 不计入 overall_status —— 它们本质是启发式信号（比如"同名符号可能是重复实
+# 现"），存在合理的假阳性（多个模块各自定义同名 Config 类），不能像 credentials/date-gap 那样一票否决。
+# 结果依然完整写进 gate-output.json，quality-reviewer 仍需读到并作为可维护性维度的证据判断，只是不会
+# 单独因为它 FAIL 就把整轮挡在 done 之外。
+_ADVISORY_GATE_NAMES = {"duplicate-symbols"}
 
 
 def _is_excluded(path: Path, project_root: Path) -> bool:
@@ -35,6 +42,7 @@ def run_all_gates(config: dict, project_root: Path) -> tuple[list[GateResult], s
     ]
     results.append(check_credentials(strategy_files))
     results.append(check_code_budget(config, project_root, strategy_files))
+    results.append(check_duplicate_symbols(project_root, strategy_files))
 
     try:
         report = run_test_command(config, project_root)
@@ -60,9 +68,10 @@ def run_all_gates(config: dict, project_root: Path) -> tuple[list[GateResult], s
         results.append(GateResult(gate="backtest-metrics", status="ERROR", evidence_tier="A", details=skipped_detail))
         results.append(GateResult(gate="lookahead-replay", status="ERROR", evidence_tier="B", details=skipped_detail))
 
-    if any(r.status == "FAIL" for r in results):
+    blocking_results = [r for r in results if r.gate not in _ADVISORY_GATE_NAMES]
+    if any(r.status == "FAIL" for r in blocking_results):
         overall = "FAIL"
-    elif any(r.status == "ERROR" for r in results):
+    elif any(r.status == "ERROR" for r in blocking_results):
         overall = "ERROR"
     else:
         overall = "PASS"

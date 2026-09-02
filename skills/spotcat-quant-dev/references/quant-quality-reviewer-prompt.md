@@ -52,10 +52,16 @@
       - 规则 #7 首次运行须 paper：新策略的首次执行是否为 paper 模式
       任一违反 → veto（总分 = 0）
 5. 对正确性/代码质量/可维护性/测试覆盖四个维度评分；风险安全维度按上方两部分分别记分（Step 4 无 veto 时记满
-   分），引用具体证据（file:line）
+   分），引用具体证据（file:line）。`duplicate-symbols` gate（若为 `FAIL`）不在门控范围内（见下），但列出的
+   每一对同名文件都必须逐一看一遍，判断是不是真的重复实现，是则计入可维护性(2.0)维度扣分并引用具体文件对；
+   判断为合理同名（如各自独立的 `Config` 类）则在评审输出里注明"已核实非重复"，不能对这份证据视而不见。
 6. 计算总分
 
 ## 门控
+
+`duplicate-symbols` 是启发式 advisory gate（见 `quant-gates.md`），**不计入以下门控判断**——它的 `FAIL`/
+`ERROR` 不使 `overall_status` 变成 FAIL/ERROR（gate-runner 已经这样计算），Step 5 里仍要读、仍要判断，只是
+不会单独 veto。下面的"全部 gate"、"任一 gate"均指除 `duplicate-symbols` 外的其余 gate。
 
 - gate-output.json 存在、run_id 匹配、全部 gate 为 `PASS` AND Step 4b 安全规则检查无违反 AND 总分 ≥ 9/10 →
   PASS

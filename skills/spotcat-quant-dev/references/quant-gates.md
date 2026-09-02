@@ -25,6 +25,11 @@ python -m spotcat_gates.gate_runner --config .spotcat/config.yml --run-id <本�
 - `code-budget`：单文件行数是否超过 `code_budget.max_file_loc`（`code_budget.ignore_file` 里列出的文件/模式
   除外）。**不属于下面 3 层测试门控**，是独立的代码卫生检查（对应可维护性打分维度），但同样由 gate-runner
   跑出、同样不允许 agent 自己数行数替代。
+- `duplicate-symbols`：同一个顶层函数/类名是否出现在多个文件里（测试文件除外）。目标是抓"AI 没查现有代码
+  就另起一个文件重新实现"这类问题。**advisory，不计入 overall_status**——FAIL 不会单独阻止进 done，因为存
+  在合理假阳性（比如多个模块各自定义同名的 `Config`/`Result` 类不是重复实现）。quality-reviewer 仍必须读
+  这份结果，把 FAIL 里列出的每一对文件当证据去判断"是不是真的重复"，计入可维护性(2.0)维度打分，不能因为
+  "不计入 overall_status"就当作没看见。
 
 `gate-output.json` 里任一 gate 的 `status` 为 `FAIL` 或 `ERROR` = 本轮不得进入 done，退回 implementing 或
 root-cause（`ERROR` 通常意味着脚本本身跑不起来或配置没接好，不是"数字不达标"，应单独记录根因，不要和"数值不
